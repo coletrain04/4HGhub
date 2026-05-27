@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>4HGS Application Hub</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="https://4hgs.com/wp-content/uploads/2025/09/image-37.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="https://4hgs.com/wp-content/uploads/2025/09/image-37.png">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header>
+    <a href="#" class="logo-container">
+      <div class="brand-text">
+        <h1>4HG SOURCE</h1>
+        <p>Application Hub</p>
+      </div>
+    </a>
+    
+    <div class="header-controls">
+      <!-- Dark/Light Theme Toggle -->
+      <button id="theme-toggle" class="theme-toggle-btn" type="button" aria-label="Toggle Light/Dark Theme">
+        <svg id="theme-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path id="theme-icon-path" stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m2.828-9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+        </svg>
+      </button>
+
+      <div class="user-selector-wrapper">
+        <span class="user-selector-label">Active Profile:</span>
+        <select id="user-dropdown" class="user-dropdown" aria-label="Switch User Profile">
+          <!-- Will be dynamically populated by JS -->
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Dashboard Grid Layout -->
+  <main class="dashboard-container">
+    
+    <!-- Left Column: Sidebar Widgets (Clock and Broadcasts) -->
+    <aside class="widgets-panel">
+      
+      <!-- Widget: Date/Clock (Desktop Only) -->
+      <section class="widget clock-widget" aria-label="Time and Date">
+        <div id="widget-time" class="clock-time">12:00 PM</div>
+        <div id="widget-date" class="clock-date">Tuesday, May 26</div>
+      </section>
+
+      <!-- Widget: Company Announcements -->
+      <section class="widget" aria-labelledby="announcements-widget-title">
+        <h2 id="announcements-widget-title" class="widget-title">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path>
+          </svg>
+          Broadcast Hub
+        </h2>
+        <div id="widget-alerts" class="alerts-list">
+          <!-- Will be dynamically populated by JS -->
+        </div>
+      </section>
+
+    </aside>
+
+    <!-- Center Column: Application Screen Container -->
+    <article class="ios-shell" id="ios-shell">
+      
+      <!-- Main Screen Content -->
+      <section class="ios-screen-content" aria-label="Application Main Panel">
+        
+        <!-- Screen Toolbar (Only visible in App Grid View) -->
+        <div class="ios-toolbar" id="ios-toolbar">
+          <h2 class="ios-view-title">4HGS <span>Apps</span></h2>
+          <div class="ios-actions">
+            <!-- Admin Settings triggers -->
+            <button id="btn-admin-portal" class="btn-ios" style="display: none;" type="button">
+              <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+              Admin Portal
+            </button>
+            <button id="btn-edit-grid" class="btn-ios" type="button">
+              <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"></path>
+              </svg>
+              Edit Layout
+            </button>
+            <button id="btn-add-app" class="btn-ios btn-ios-accent" style="display: none;" type="button">
+              + Add App
+            </button>
+          </div>
+        </div>
+
+        <!-- Application grid View -->
+        <div class="app-grid" id="main-app-grid">
+          <!-- Injected dynamically by JS -->
+        </div>
+
+        <!-- INLINE ADMIN CONFIGURATION PANEL (Replaces Popup!) -->
+        <div class="admin-panel-inline" id="admin-panel-inline" style="display: none;">
+          <div class="admin-panel-header">
+            <h3 class="admin-panel-title">Admin Configuration Portal</h3>
+            <button class="btn-ios" id="btn-close-admin-panel" type="button">
+              &larr; Exit Admin Settings
+            </button>
+          </div>
+          
+          <!-- Tab Navigation -->
+          <div class="dialog-tabs">
+            <button class="dialog-tab-btn active" data-tab="tab-apps" type="button">Applications</button>
+            <button class="dialog-tab-btn" data-tab="tab-permissions" type="button">User Access Matrix</button>
+            <button class="dialog-tab-btn" data-tab="tab-users" type="button">Users</button>
+            <button class="dialog-tab-btn" data-tab="tab-broadcasts" type="button">Broadcast Manager</button>
+          </div>
+
+          <!-- TAB: Applications Manager -->
+          <div class="dialog-tab-content active" id="tab-apps">
+            <form id="app-curator-form">
+              <!-- Edit indicator storage -->
+              <input type="hidden" id="edit-app-id" value="">
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="app-name">App Name</label>
+                  <input type="text" id="app-name" class="form-control" placeholder="e.g. Invoicing Manager" required autocomplete="off">
+                </div>
+                <div class="form-group">
+                  <label for="app-link">External URL Link</label>
+                  <input type="url" id="app-link" class="form-control" placeholder="https://billing.4hgs.com" required autocomplete="off">
+                </div>
+              </div>
+              <div class="form-group">
+                <label id="icon-picker-label">Select Icon Style</label>
+                <div class="icon-selector-grid" id="icon-selector-grid">
+                  <!-- Will be populated dynamically by JS -->
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="btn-ios" id="btn-reset-app-form">Clear / New</button>
+                <button type="submit" class="btn-ios btn-ios-accent" id="btn-save-app">Save Application</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- TAB: User Permissions Manager -->
+          <div class="dialog-tab-content" id="tab-permissions">
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+              Tick checkboxes to assign specific application links to each user profile:
+            </p>
+            <div class="matrix-container">
+              <table class="matrix-table" id="permissions-matrix-table">
+                <!-- Dynamic JS inject rows -->
+              </table>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn-ios btn-ios-accent" id="btn-save-permissions">Save Access Matrix</button>
+            </div>
+          </div>
+
+          <!-- TAB: Users Manager -->
+          <div class="dialog-tab-content" id="tab-users">
+            <div class="user-list" id="users-panel-list">
+              <!-- Will be dynamically populated by JS -->
+            </div>
+            <form id="user-creator-form">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="new-user-name">Employee Name</label>
+                  <input type="text" id="new-user-name" class="form-control" placeholder="e.g., Mark Davis" required autocomplete="name">
+                </div>
+                <div class="form-group">
+                  <label for="new-user-role">Assigned Role</label>
+                  <select id="new-user-role" class="form-control" required>
+                    <option value="Admin">Administrator</option>
+                    <option value="Sales">Sales Specialist</option>
+                    <option value="Technician">Technician</option>
+                    <option value="Guest">Guest</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn-ios btn-ios-accent">+ Create User</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- TAB: Broadcasts Manager (Post and Edit Announcements!) -->
+          <div class="dialog-tab-content" id="tab-broadcasts">
+            <div class="user-list" id="broadcasts-panel-list" style="max-height: 200px;">
+              <!-- Dynamic JS table of alerts with Edit/Delete triggers -->
+            </div>
+            <form id="broadcast-curator-form">
+              <!-- Edit indicator storage -->
+              <input type="hidden" id="edit-broadcast-id" value="">
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="broadcast-title">Announcement Headline</label>
+                  <input type="text" id="broadcast-title" class="form-control" placeholder="e.g. Parts Inventory Update" required autocomplete="off">
+                </div>
+                <div class="form-group">
+                  <label for="broadcast-time">Date / Time Caption</label>
+                  <input type="text" id="broadcast-time" class="form-control" placeholder="e.g. 09:30 AM, Yesterday, or May 26" required autocomplete="off">
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="broadcast-body">Announcement Details</label>
+                <textarea id="broadcast-body" class="form-control" style="resize: vertical; min-height: 60px;" placeholder="Describe the announcement news here..." required></textarea>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="btn-ios" id="btn-reset-broadcast-form">Clear / New</button>
+                <button type="submit" class="btn-ios btn-ios-accent" id="btn-save-broadcast">Publish Broadcast</button>
+              </div>
+            </form>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- Translucent Folder Drawer Overlay (iOS folder expanded state) -->
+      <div class="ios-folder-overlay" id="folder-overlay" aria-modal="true" role="dialog" aria-label="Folder Details">
+        <div class="folder-drawer">
+          <div class="folder-drawer-header">
+            <input type="text" class="folder-drawer-title" id="folder-drawer-title" value="Folder Name" aria-label="Folder Title">
+            <button class="folder-drawer-close" id="btn-close-folder" aria-label="Close Folder">&times;</button>
+          </div>
+          <div class="folder-drawer-grid" id="folder-app-grid">
+            <!-- Dynamically populated drawer icons -->
+          </div>
+        </div>
+      </div>
+
+    </article>
+
+  </main>
+
+  <!-- Notification Toast Container -->
+  <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+  <!-- Page Footer -->
+  <footer>
+    <p>&copy; 2026 <a href="https://4hgs.com" target="_blank" rel="noopener noreferrer">4HG Source LLC</a>. All internal system apps are protected by network credentials.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
