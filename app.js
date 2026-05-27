@@ -1,6 +1,6 @@
 // 4HGS Application Hub - Core Logic & State Management
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updateEmail, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -257,7 +257,7 @@ function renderAppGrid() {
   
   // Show / Hide Settings trigger in header
   const btnAdmin = document.getElementById('btn-admin-portal');
-  if (isAdmin) {
+  if (state.activeUserId) {
     btnAdmin.style.display = 'inline-flex';
   } else {
     btnAdmin.style.display = 'none';
@@ -650,10 +650,30 @@ function openAdminPortal() {
   document.getElementById('ios-toolbar').style.display = 'none';
   document.getElementById('admin-panel-inline').style.display = 'flex';
   
-  renderIconSelector();
-  renderPermissionsMatrix();
-  renderUsersList();
-  renderBroadcastList();
+  // Pre-fill profile settings
+  loadProfileIntoForm();
+
+  // Render tab controls based on role (Admin gets all tabs, non-Admin only gets 'My Account')
+  const activeUser = getActiveUser();
+  const isAdmin = activeUser && activeUser.role === 'Admin';
+  
+  const adminTabs = ['tab-btn-apps', 'tab-btn-permissions', 'tab-btn-users', 'tab-btn-broadcasts'];
+  adminTabs.forEach(tabId => {
+    const tabBtn = document.getElementById(tabId);
+    if (tabBtn) {
+      tabBtn.style.display = isAdmin ? 'inline-block' : 'none';
+    }
+  });
+
+  // Switch to 'My Account' tab initially
+  document.querySelector('.dialog-tab-btn[data-tab="tab-account"]').click();
+  
+  if (isAdmin) {
+    renderIconSelector();
+    renderPermissionsMatrix();
+    renderUsersList();
+    renderBroadcastList();
+  }
 }
 
 function closeAdminPortal() {
@@ -736,8 +756,18 @@ function renderUsersList() {
         <span class="user-item-role">${user.role}</span>
         <span style="font-size:0.75rem; color:var(--text-secondary);">${user.email || 'No email registered'}</span>
       </div>
-      ${user.id !== 'user-admin' ? `<button class="btn-icon-delete" data-id="${user.id}">&times; Delete</button>` : ''}
+      <div style="display:flex; gap:0.5rem; align-items:center;">
+        <button class="btn-icon-edit" data-id="${user.id}" style="background:rgba(255,255,255,0.05); color:var(--text-primary); border:1px solid var(--glass-border); padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem; cursor:pointer;">Edit</button>
+        ${user.id !== 'user-admin' ? `<button class="btn-icon-delete" data-id="${user.id}" style="background:rgba(255,59,48,0.1); color:#ff3b30; border:1px solid rgba(255,59,48,0.15); padding:0.25rem 0.5rem; border-radius:4px; font-size:0.7rem; cursor:pointer;">&times; Delete</button>` : ''}
+      </div>
     `;
+
+    const editBtn = div.querySelector('.btn-icon-edit');
+    if (editBtn) {
+      editBtn.addEventListener('click', () => {
+        loadUserIntoForm(user);
+      });
+    }
 
     const deleteBtn = div.querySelector('.btn-icon-delete');
     if (deleteBtn) {
@@ -849,33 +879,144 @@ function handleAppSubmit(e) {
 // User form save handler
 function handleUserSubmit(e) {
   e.preventDefault();
+  const editId = document.getElementById('edit-user-id').value;
   const name = document.getElementById('new-user-name').value.trim();
+  const email = document.getElementById('new-user-email').value.trim().toLowerCase();
   const role = document.getElementById('new-user-role').value;
   
   if (!name || !role) return;
 
-  const userId = `user-${Date.now()}`;
-  const newUser = { id: userId, name: name, role: role, email: '' }; // Admin will assign email manually
-  
-  state.users.push(newUser);
-  
-  let initialPerms = ['catalog', 'ai-troubleshoot'];
-  if (role === 'Admin') {
-    initialPerms = state.apps.map(a => a.id);
-  } else if (role === 'Sales') {
-    initialPerms = ['orders', 'crm', 'catalog', 'folder-ops'];
-  } else if (role === 'Technician') {
-    initialPerms = ['inventory', 'repairs', 'catalog', 'ai-troubleshoot', 'folder-ops'];
+  if (editId) {
+    // Editing an existing user
+    const userIndex = state.users.findIndex(u => u.id === editId);
+    if (userIndex !== -1) {
+      state.users[userIndex].name = name;
+      state.users[userIndex].email = email;
+      state.users[userIndex].role = role;
+      showToast(`Updated Profile: ${name}`);
+    }
+  } else {
+    // Creating a new user
+    const userId = `user-${Date.now()}`;
+    const newUser = { id: userId, name: name, role: role, email: email };
+    state.users.push(newUser);
+    
+    let initialPerms = ['catalog', 'ai-troubleshoot'];
+    if (role === 'Admin') {
+      initialPerms = state.apps.map(a => a.id);
+    } else if (role === 'Sales') {
+      initialPerms = ['orders', 'crm', 'catalog', 'folder-ops'];
+    } else if (role === 'Technician') {
+      initialPerms = ['inventory', 'repairs', 'catalog', 'ai-troubleshoot', 'folder-ops'];
+    }
+    state.permissions[userId] = initialPerms;
+    showToast(`Created Profile: ${name}`);
   }
-  
-  state.permissions[userId] = initialPerms;
 
   saveDatabase();
   renderUsersList();
   renderPermissionsMatrix();
-  
+  resetUserForm();
+}
+
+function loadUserIntoForm(user) {
+  document.getElementById('edit-user-id').value = user.id;
+  document.getElementById('new-user-name').value = user.name || '';
+  document.getElementById('new-user-email').value = user.email || '';
+  document.getElementById('new-user-role').value = user.role || 'Guest';
+  document.getElementById('btn-save-user').textContent = 'Update Employee Profile';
+}
+
+function resetUserForm() {
   document.getElementById('user-creator-form').reset();
-  showToast(`Created Employee Profile: ${name}`);
+  document.getElementById('edit-user-id').value = '';
+  document.getElementById('btn-save-user').textContent = 'Create Employee Profile';
+}
+
+// Active Profile Self Management Forms
+function loadProfileIntoForm() {
+  const user = auth.currentUser;
+  const activeUser = getActiveUser();
+  if (!user || !activeUser) return;
+
+  document.getElementById('profile-name').value = activeUser.name || '';
+  document.getElementById('profile-role').value = activeUser.role || 'Guest';
+  document.getElementById('profile-email').value = user.email || '';
+  document.getElementById('profile-password').value = '';
+  document.getElementById('profile-confirm-password').value = '';
+  document.getElementById('profile-error-msg').style.display = 'none';
+}
+
+function handleProfileSubmit(e) {
+  e.preventDefault();
+  const name = document.getElementById('profile-name').value.trim();
+  const email = document.getElementById('profile-email').value.trim().toLowerCase();
+  const password = document.getElementById('profile-password').value;
+  const confirmPassword = document.getElementById('profile-confirm-password').value;
+  const errorDiv = document.getElementById('profile-error-msg');
+  const submitBtn = document.getElementById('btn-save-profile');
+
+  errorDiv.style.display = 'none';
+  
+  if (password && password !== confirmPassword) {
+    errorDiv.textContent = "Passwords do not match.";
+    errorDiv.style.display = 'block';
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Updating Profile...';
+
+  const promises = [];
+  const user = auth.currentUser;
+  const activeUser = getActiveUser();
+
+  // Update Display Name
+  if (name && name !== activeUser.name) {
+    promises.push(
+      updateProfile(user, { displayName: name }).then(() => {
+        activeUser.name = name;
+      })
+    );
+  }
+
+  // Update Email
+  if (email && email !== user.email) {
+    promises.push(
+      updateEmail(user, email).then(() => {
+        activeUser.email = email;
+      })
+    );
+  }
+
+  // Update Password
+  if (password) {
+    promises.push(updatePassword(user, password));
+  }
+
+  Promise.all(promises)
+    .then(() => {
+      saveDatabase();
+      renderAuthHeader(auth.currentUser);
+      renderAppGrid();
+      showToast('Profile updated successfully!');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Update Account Details';
+      loadProfileIntoForm();
+    })
+    .catch((error) => {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Update Account Details';
+      
+      let msg = error.message;
+      if (error.code === 'auth/requires-recent-login') {
+        msg = 'Security check: Please log out and log back in to perform email/password changes.';
+      }
+      
+      errorDiv.textContent = msg;
+      errorDiv.style.display = 'block';
+      showToast('Update failed', false);
+    });
 }
 
 // Permissions save matrix handler
@@ -1062,10 +1203,12 @@ function bindEventHandlers() {
 
   document.getElementById('btn-reset-app-form').addEventListener('click', resetAppCuratorForm);
   document.getElementById('btn-reset-broadcast-form').addEventListener('click', resetBroadcastForm);
+  document.getElementById('btn-reset-user-form').addEventListener('click', resetUserForm);
 
   // Forms submissions hooks
   document.getElementById('app-curator-form').addEventListener('submit', handleAppSubmit);
   document.getElementById('user-creator-form').addEventListener('submit', handleUserSubmit);
+  document.getElementById('profile-settings-form').addEventListener('submit', handleProfileSubmit);
   document.getElementById('broadcast-curator-form').addEventListener('submit', handleBroadcastSubmit);
   document.getElementById('btn-save-permissions').addEventListener('click', handlePermissionsSave);
 

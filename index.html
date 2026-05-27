@@ -77,7 +77,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
               </svg>
-              Admin Portal
+              Account & Settings
             </button>
             <button id="btn-edit-grid" class="btn-ios" type="button">
               <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -99,22 +99,57 @@
         <!-- INLINE ADMIN CONFIGURATION PANEL (Replaces Popup!) -->
         <div class="admin-panel-inline" id="admin-panel-inline" style="display: none;">
           <div class="admin-panel-header">
-            <h3 class="admin-panel-title">Admin Configuration Portal</h3>
+            <h3 class="admin-panel-title">System Settings & Accounts</h3>
             <button class="btn-ios" id="btn-close-admin-panel" type="button">
-              &larr; Exit Admin Settings
+              &larr; Exit Settings
             </button>
           </div>
           
           <!-- Tab Navigation -->
           <div class="dialog-tabs">
-            <button class="dialog-tab-btn active" data-tab="tab-apps" type="button">Applications</button>
-            <button class="dialog-tab-btn" data-tab="tab-permissions" type="button">User Access Matrix</button>
-            <button class="dialog-tab-btn" data-tab="tab-users" type="button">Users</button>
-            <button class="dialog-tab-btn" data-tab="tab-broadcasts" type="button">Broadcast Manager</button>
+            <button class="dialog-tab-btn active" data-tab="tab-account" type="button">My Account</button>
+            <button class="dialog-tab-btn" data-tab="tab-apps" id="tab-btn-apps" type="button">Applications</button>
+            <button class="dialog-tab-btn" data-tab="tab-permissions" id="tab-btn-permissions" type="button">User Access Matrix</button>
+            <button class="dialog-tab-btn" data-tab="tab-users" id="tab-btn-users" type="button">Users</button>
+            <button class="dialog-tab-btn" data-tab="tab-broadcasts" id="tab-btn-broadcasts" type="button">Broadcast Manager</button>
+          </div>
+
+          <!-- TAB: My Account Profile Settings -->
+          <div class="dialog-tab-content active" id="tab-account">
+            <form id="profile-settings-form">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="profile-name">Display Name</label>
+                  <input type="text" id="profile-name" class="form-control" placeholder="Your Name" required autocomplete="name">
+                </div>
+                <div class="form-group">
+                  <label for="profile-role">Account Role Privilege</label>
+                  <input type="text" id="profile-role" class="form-control" readonly style="opacity: 0.65; cursor: not-allowed; background: rgba(255,255,255,0.03);">
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="profile-email">Login Email Address</label>
+                <input type="email" id="profile-email" class="form-control" placeholder="name@4hgs.com" required autocomplete="email">
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="profile-password">New Password (Leave blank to keep current)</label>
+                  <input type="password" id="profile-password" class="form-control" placeholder="••••••••" autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                  <label for="profile-confirm-password">Confirm New Password</label>
+                  <input type="password" id="profile-confirm-password" class="form-control" placeholder="••••••••" autocomplete="new-password">
+                </div>
+              </div>
+              <div id="profile-error-msg" style="color: #ff3b30; font-size: 0.85rem; font-weight: 600; display: none; text-align: center; background: rgba(255,59,48,0.08); padding: 0.6rem; border-radius: 6px; border: 1px solid rgba(255,59,48,0.15); margin-bottom: 1rem;"></div>
+              <div class="form-actions">
+                <button type="submit" class="btn-ios btn-ios-accent" id="btn-save-profile">Update Account Details</button>
+              </div>
+            </form>
           </div>
 
           <!-- TAB: Applications Manager -->
-          <div class="dialog-tab-content active" id="tab-apps">
+          <div class="dialog-tab-content" id="tab-apps">
             <form id="app-curator-form">
               <!-- Edit indicator storage -->
               <input type="hidden" id="edit-app-id" value="">
@@ -163,23 +198,31 @@
               <!-- Will be dynamically populated by JS -->
             </div>
             <form id="user-creator-form">
+              <!-- Edit indicator storage -->
+              <input type="hidden" id="edit-user-id" value="">
+              
               <div class="form-row">
                 <div class="form-group">
                   <label for="new-user-name">Employee Name</label>
                   <input type="text" id="new-user-name" class="form-control" placeholder="e.g., Mark Davis" required autocomplete="name">
                 </div>
                 <div class="form-group">
-                  <label for="new-user-role">Assigned Role</label>
-                  <select id="new-user-role" class="form-control" required>
-                    <option value="Admin">Administrator</option>
-                    <option value="Sales">Sales Specialist</option>
-                    <option value="Technician">Technician</option>
-                    <option value="Guest">Guest</option>
-                  </select>
+                  <label for="new-user-email">Login Email</label>
+                  <input type="email" id="new-user-email" class="form-control" placeholder="name@4hgs.com" required autocomplete="email">
                 </div>
               </div>
+              <div class="form-group">
+                <label for="new-user-role">Assigned Role</label>
+                <select id="new-user-role" class="form-control" required>
+                  <option value="Admin">Administrator</option>
+                  <option value="Sales">Sales Specialist</option>
+                  <option value="Technician">Technician</option>
+                  <option value="Guest">Guest</option>
+                </select>
+              </div>
               <div class="form-actions">
-                <button type="submit" class="btn-ios btn-ios-accent">+ Create User</button>
+                <button type="button" class="btn-ios" id="btn-reset-user-form">Clear / New</button>
+                <button type="submit" class="btn-ios btn-ios-accent" id="btn-save-user">Create Employee Profile</button>
               </div>
             </form>
           </div>
