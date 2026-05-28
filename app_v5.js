@@ -816,7 +816,7 @@ function renderAppGrid() {
     if (subsequentContainer) subsequentContainer.style.display = 'none';
     document.getElementById('ios-toolbar').style.display = 'none';
     mainGrid.innerHTML = `
-      <section class="widget" style="text-align: center; padding: 3rem 2rem; max-width: 440px; margin: 2rem auto; background: var(--glass-bg); border-radius: 16px; border: 1px solid var(--glass-border); box-shadow: var(--shadow-premium);">
+      <div style="text-align: center; padding: 1rem 0.5rem; max-width: 440px; margin: 0 auto;">
         <div style="background: rgba(141,220,4,0.08); width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem;">
           <svg style="width: 32px; height: 32px; color: var(--accent-green);" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
@@ -845,7 +845,7 @@ function renderAppGrid() {
             Secure Login
           </button>
         </form>
-      </section>
+      </div>
     `;
     
     const loginForm = document.getElementById('portal-login-form');
