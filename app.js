@@ -1,6 +1,7 @@
 // 4HGS Application Hub - Core Logic & State Management
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updateEmail, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -16,6 +17,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
 
 // Icon SVGs library
 const SVG_ICONS = {
@@ -103,6 +105,34 @@ let state = {
 
 // Database Persistence Helpers
 function initDatabase() {
+  if (!localStorage.getItem('HGS_THEME')) {
+    localStorage.setItem('HGS_THEME', 'dark');
+  }
+  state.theme = localStorage.getItem('HGS_THEME');
+  applyTheme();
+
+  // Instant layout defaults for visual loading
+  state.apps = DEFAULT_APPS;
+  state.sections = DEFAULT_SECTIONS;
+  state.broadcasts = DEFAULT_BROADCASTS;
+  state.users = DEFAULT_USERS;
+  state.permissions = DEFAULT_PERMISSIONS;
+  
+  state.apps.forEach(app => {
+    if (!app.sectionId) app.sectionId = 'default';
+  });
+}
+
+function saveDatabase() {
+  localStorage.setItem('HGS_APPS', JSON.stringify(state.apps));
+  localStorage.setItem('HGS_USERS', JSON.stringify(state.users));
+  localStorage.setItem('HGS_PERMISSIONS', JSON.stringify(state.permissions));
+  localStorage.setItem('HGS_BROADCASTS', JSON.stringify(state.broadcasts));
+  localStorage.setItem('HGS_SECTIONS', JSON.stringify(state.sections));
+  localStorage.setItem('HGS_THEME', state.theme);
+}
+
+function loadDatabaseOfflineFallback() {
   if (!localStorage.getItem('HGS_APPS')) {
     localStorage.setItem('HGS_APPS', JSON.stringify(DEFAULT_APPS));
   }
@@ -118,65 +148,274 @@ function initDatabase() {
   if (!localStorage.getItem('HGS_SECTIONS')) {
     localStorage.setItem('HGS_SECTIONS', JSON.stringify(DEFAULT_SECTIONS));
   }
-  if (!localStorage.getItem('HGS_THEME')) {
-    localStorage.setItem('HGS_THEME', 'dark');
-  }
 
-  // Load from Storage to memory State
   state.apps = JSON.parse(localStorage.getItem('HGS_APPS'));
   state.users = JSON.parse(localStorage.getItem('HGS_USERS'));
   state.permissions = JSON.parse(localStorage.getItem('HGS_PERMISSIONS'));
   state.broadcasts = JSON.parse(localStorage.getItem('HGS_BROADCASTS'));
   state.sections = JSON.parse(localStorage.getItem('HGS_SECTIONS')) || DEFAULT_SECTIONS;
-  state.theme = localStorage.getItem('HGS_THEME');
   
-  // Migration: Ensure all apps have a sectionId (defaults to 'default')
   state.apps.forEach(app => {
-    if (!app.sectionId) {
-      app.sectionId = 'default';
-    }
+    if (!app.sectionId) app.sectionId = 'default';
   });
 
-  // Migration: Remove the old seed admin 'user-admin' and establish 'XSGpEYIjdaTjxxAuuTZ6chMbe1I2' as the sole Admin
-  state.users = state.users.filter(u => u.id !== 'user-admin');
-  delete state.permissions['user-admin'];
-
-  // Check if our active Admin profile is in the list
-  const activeAdminId = 'XSGpEYIjdaTjxxAuuTZ6chMbe1I2';
-  let activeAdmin = state.users.find(u => u.id === activeAdminId || u.email === 'cole@4hgs.com');
-  
-  if (activeAdmin) {
-    activeAdmin.id = activeAdminId;
-    activeAdmin.email = 'cole@4hgs.com';
-    activeAdmin.role = 'Admin';
-  } else {
-    activeAdmin = {
-      id: activeAdminId,
-      name: 'Cole Ankney',
-      role: 'Admin',
-      email: 'cole@4hgs.com'
-    };
-    state.users.push(activeAdmin);
-  }
-
-  // Ensure they have full permissions
-  state.permissions[activeAdminId] = state.apps.map(a => a.id);
-  
-  // Clean up any remaining duplicate profiles with email cole@4hgs.com that aren't the main one
-  state.users = state.users.filter(u => u.id === activeAdminId || u.email !== 'cole@4hgs.com');
-  
-  saveDatabase();
-  
-  applyTheme();
+  renderWidgets();
+  renderAuthHeader(auth.currentUser);
+  renderAppGrid();
 }
 
-function saveDatabase() {
-  localStorage.setItem('HGS_APPS', JSON.stringify(state.apps));
-  localStorage.setItem('HGS_USERS', JSON.stringify(state.users));
-  localStorage.setItem('HGS_PERMISSIONS', JSON.stringify(state.permissions));
-  localStorage.setItem('HGS_BROADCASTS', JSON.stringify(state.broadcasts));
-  localStorage.setItem('HGS_SECTIONS', JSON.stringify(state.sections));
-  localStorage.setItem('HGS_THEME', state.theme);
+async function loadDatabaseFromFirestore() {
+  // Theme is device specific, load locally
+  if (!localStorage.getItem('HGS_THEME')) {
+    localStorage.setItem('HGS_THEME', 'dark');
+  }
+  state.theme = localStorage.getItem('HGS_THEME');
+  applyTheme();
+
+  if (!auth.currentUser) return;
+
+  try {
+    // 1. Fetch apps
+    const appsSnapshot = await getDocs(collection(db, "apps"));
+    const appsList = [];
+    appsSnapshot.forEach(doc => {
+      appsList.push(doc.data());
+    });
+    
+    // 2. Fetch sections
+    const sectionsSnapshot = await getDocs(collection(db, "sections"));
+    const sectionsList = [];
+    sectionsSnapshot.forEach(doc => {
+      sectionsList.push(doc.data());
+    });
+    
+    // 3. Fetch broadcasts
+    const broadcastsSnapshot = await getDocs(collection(db, "broadcasts"));
+    const broadcastsList = [];
+    broadcastsSnapshot.forEach(doc => {
+      broadcastsList.push(doc.data());
+    });
+    
+    // 4. Fetch users
+    const usersSnapshot = await getDocs(collection(db, "users"));
+    const usersList = [];
+    usersSnapshot.forEach(doc => {
+      usersList.push(doc.data());
+    });
+    
+    // 5. Fetch permissions
+    const permissionsSnapshot = await getDocs(collection(db, "permissions"));
+    const permissionsMap = {};
+    permissionsSnapshot.forEach(doc => {
+      permissionsMap[doc.id] = doc.data().appIds || [];
+    });
+
+    const isCole = auth.currentUser.email && (
+      auth.currentUser.email.toLowerCase() === 'cole@4hgs.com' ||
+      auth.currentUser.email.toLowerCase().includes('cole')
+    );
+
+    // Bootstrap seeding check
+    if (appsList.length === 0 && isCole) {
+      showToast("Seeding empty database...", true);
+      await seedFirestoreDatabase();
+      return;
+    }
+
+    // Assign to in-memory state
+    state.apps = appsList.length > 0 ? appsList : DEFAULT_APPS;
+    state.sections = sectionsList.length > 0 ? sectionsList : DEFAULT_SECTIONS;
+    state.broadcasts = broadcastsList;
+    state.users = usersList;
+    state.permissions = permissionsMap;
+
+    // Ensure current active user profile exists in database
+    let activeUser = state.users.find(u => u.id === auth.currentUser.uid);
+    if (!activeUser) {
+      activeUser = {
+        id: auth.currentUser.uid,
+        name: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
+        email: auth.currentUser.email.toLowerCase(),
+        role: isCole ? 'Admin' : 'Guest'
+      };
+      state.users.push(activeUser);
+      await setDoc(doc(db, "users", activeUser.id), activeUser);
+
+      // Seed standard permissions
+      const initialPerms = isCole ? state.apps.map(a => a.id) : ['catalog', 'ai-troubleshoot'];
+      state.permissions[activeUser.id] = initialPerms;
+      await setDoc(doc(db, "permissions", activeUser.id), { appIds: initialPerms });
+      
+      saveDatabase();
+    }
+
+    state.activeUserId = activeUser.id;
+
+    // Apply migrations/sanity checks
+    state.apps.forEach(app => {
+      if (!app.sectionId) app.sectionId = 'default';
+    });
+
+    renderWidgets();
+    renderAuthHeader(auth.currentUser);
+    renderAppGrid();
+
+  } catch (error) {
+    console.error("Firestore database load error:", error);
+    showToast("Firestore connection failed. Running offline fallback.", false);
+    loadDatabaseOfflineFallback();
+  }
+}
+
+async function seedFirestoreDatabase() {
+  try {
+    const appsToSeed = DEFAULT_APPS.map(app => {
+      if (!app.sectionId) app.sectionId = 'default';
+      return app;
+    });
+
+    // 1. Apps
+    for (const app of appsToSeed) {
+      await setDoc(doc(db, "apps", app.id), app);
+    }
+    
+    // 2. Sections
+    for (const section of DEFAULT_SECTIONS) {
+      await setDoc(doc(db, "sections", section.id), section);
+    }
+    
+    // 3. Broadcasts
+    for (const broadcast of DEFAULT_BROADCASTS) {
+      await setDoc(doc(db, "broadcasts", broadcast.id), broadcast);
+    }
+    
+    // 4. Admin Profile
+    const adminUser = {
+      id: auth.currentUser.uid,
+      name: auth.currentUser.displayName || 'Cole Ankney',
+      email: auth.currentUser.email.toLowerCase(),
+      role: 'Admin'
+    };
+    await setDoc(doc(db, "users", adminUser.id), adminUser);
+    
+    // Seed reference users
+    const otherUsers = DEFAULT_USERS.filter(u => u.id !== 'XSGpEYIjdaTjxxAuuTZ6chMbe1I2');
+    for (const u of otherUsers) {
+      await setDoc(doc(db, "users", u.id), u);
+    }
+
+    // 5. Permissions
+    const allAppIds = appsToSeed.map(a => a.id);
+    await setDoc(doc(db, "permissions", adminUser.id), { appIds: allAppIds });
+    
+    for (const userId of Object.keys(DEFAULT_PERMISSIONS)) {
+      if (userId !== 'XSGpEYIjdaTjxxAuuTZ6chMbe1I2') {
+        await setDoc(doc(db, "permissions", userId), { appIds: DEFAULT_PERMISSIONS[userId] });
+      }
+    }
+    
+    saveDatabase();
+    showToast("Database seeded successfully!", true);
+    await loadDatabaseFromFirestore();
+  } catch (err) {
+    console.error("Firestore seeding failed:", err);
+    showToast("Seeding failed.", false);
+  }
+}
+
+// --- Firestore Asynchronous Sync Operators ---
+
+async function syncAppToFirestore(app) {
+  try {
+    await setDoc(doc(db, "apps", app.id), app);
+  } catch (err) {
+    console.error("Sync error:", err);
+  }
+}
+
+async function syncDeleteAppFromFirestore(appId) {
+  try {
+    await deleteDoc(doc(db, "apps", appId));
+  } catch (err) {
+    console.error("Sync error:", err);
+  }
+}
+
+async function syncSectionToFirestore(section) {
+  try {
+    await setDoc(doc(db, "sections", section.id), section);
+  } catch (err) {
+    console.error("Sync error:", err);
+  }
+}
+
+async function syncDeleteSectionFromFirestore(sectionId) {
+  try {
+    await deleteDoc(doc(db, "sections", sectionId));
+  } catch (err) {
+    console.error("Sync error:", err);
+  }
+}
+
+async function syncBroadcastToFirestore(broadcast) {
+  try {
+    await setDoc(doc(db, "broadcasts", broadcast.id), broadcast);
+  } catch (err) {
+    console.error("Sync error:", err);
+  }
+}
+
+async function syncDeleteBroadcastFromFirestore(broadcastId) {
+  try {
+    await deleteDoc(doc(db, "broadcasts", broadcastId));
+  } catch (err) {
+    console.error("Sync error:", err);
+  }
+}
+
+async function syncUserToFirestore(user) {
+  try {
+    await setDoc(doc(db, "users", user.id), user);
+  } catch (err) {
+    console.error("Sync error:", err);
+  }
+}
+
+async function syncDeleteUserFromFirestore(userId) {
+  try {
+    await deleteDoc(doc(db, "users", userId));
+    await deleteDoc(doc(db, "permissions", userId));
+  } catch (err) {
+    console.error("Sync error:", err);
+  }
+}
+
+async function syncPermissionToFirestore(userId, appIds) {
+  try {
+    await setDoc(doc(db, "permissions", userId), { appIds: appIds });
+  } catch (err) {
+    console.error("Sync error:", err);
+  }
+}
+
+async function syncAllAppsOrderToFirestore() {
+  try {
+    for (const app of state.apps) {
+      await updateDoc(doc(db, "apps", app.id), { order: app.order });
+    }
+  } catch (err) {
+    console.error("Sync error:", err);
+  }
+}
+
+async function syncAllSectionsOrderToFirestore() {
+  try {
+    for (const section of state.sections) {
+      await updateDoc(doc(db, "sections", section.id), { order: section.order });
+    }
+  } catch (err) {
+    console.error("Sync error:", err);
+  }
 }
 
 // Apply theme helper
@@ -691,6 +930,7 @@ function handleFolderRename(e) {
   if (folder && e.target.value.trim()) {
     folder.name = e.target.value.trim();
     saveDatabase();
+    syncAppToFirestore(folder);
     renderAppGrid();
   }
 }
@@ -750,6 +990,7 @@ function setupDragDropEvents(element) {
             
             state.apps.push(newFolder);
             saveDatabase();
+            syncAppToFirestore(newFolder);
             showToast('New Folder Created!');
             renderAppGrid();
             return;
@@ -762,6 +1003,7 @@ function setupDragDropEvents(element) {
         state.apps[targetIndex].order = tempOrder;
         
         saveDatabase();
+        syncAllAppsOrderToFirestore();
         renderAppGrid();
         showToast('App layout updated');
       }
@@ -812,6 +1054,7 @@ function deleteApp(appId) {
   
   state.apps.splice(appIndex, 1);
   saveDatabase();
+  syncDeleteAppFromFirestore(appId);
   renderAppGrid();
   renderAppsPanelList();
   showToast('Application deleted successfully');
@@ -984,6 +1227,7 @@ function renderAppsPanelList() {
         prevApp.order = tempOrder;
         
         saveDatabase();
+        syncAllAppsOrderToFirestore();
         renderAppsPanelList();
         renderAppGrid();
         showToast(`Moved "${app.name}" up`);
@@ -1000,6 +1244,7 @@ function renderAppsPanelList() {
         nextApp.order = tempOrder;
         
         saveDatabase();
+        syncAllAppsOrderToFirestore();
         renderAppsPanelList();
         renderAppGrid();
         showToast(`Moved "${app.name}" down`);
@@ -1078,6 +1323,7 @@ function deleteUser(userId) {
   }
   
   saveDatabase();
+  syncDeleteUserFromFirestore(userId);
   renderUsersList();
   renderPermissionsMatrix();
   renderAppGrid();
@@ -1189,6 +1435,8 @@ function handleUserSubmit(e) {
       state.users[userIndex].email = email;
       state.users[userIndex].role = role;
       showToast(`Updated Profile: ${name}`);
+      
+      syncUserToFirestore(state.users[userIndex]);
     }
   } else {
     // Creating a new user
@@ -1206,6 +1454,9 @@ function handleUserSubmit(e) {
     }
     state.permissions[userId] = initialPerms;
     showToast(`Created Profile: ${name}`);
+    
+    syncUserToFirestore(newUser);
+    syncPermissionToFirestore(userId, initialPerms);
   }
 
   saveDatabase();
@@ -1292,6 +1543,7 @@ function handleProfileSubmit(e) {
   Promise.all(promises)
     .then(() => {
       saveDatabase();
+      syncUserToFirestore(activeUser);
       renderAuthHeader(auth.currentUser);
       renderAppGrid();
       showToast('Profile updated successfully!');
@@ -1336,6 +1588,14 @@ function handlePermissionsSave() {
   });
 
   saveDatabase();
+  
+  // Sync changed user permissions to Firestore
+  state.users.forEach(user => {
+    if (user.role !== 'Admin') {
+      syncPermissionToFirestore(user.id, state.permissions[user.id] || []);
+    }
+  });
+  
   renderAppGrid();
   showToast('Employee Permissions Saved!');
   closeAdminPortal();
@@ -1383,6 +1643,7 @@ function renderSectionsPanelList() {
         section.order = prevSection.order;
         prevSection.order = tempOrder;
         saveDatabase();
+        syncAllSectionsOrderToFirestore();
         renderSectionsPanelList();
         renderAppGrid();
         showToast('Section order updated.');
@@ -1397,6 +1658,7 @@ function renderSectionsPanelList() {
         section.order = nextSection.order;
         nextSection.order = tempOrder;
         saveDatabase();
+        syncAllSectionsOrderToFirestore();
         renderSectionsPanelList();
         renderAppGrid();
         showToast('Section order updated.');
@@ -1428,9 +1690,13 @@ function deleteSection(id) {
   if (id === 'default') return;
   state.sections = state.sections.filter(s => s.id !== id);
   state.apps.forEach(app => {
-    if (app.sectionId === id) app.sectionId = 'default';
+    if (app.sectionId === id) {
+      app.sectionId = 'default';
+      syncAppToFirestore(app);
+    }
   });
   saveDatabase();
+  syncDeleteSectionFromFirestore(id);
   renderSectionsPanelList();
   renderAppSectionSelect();
   renderAppGrid();
@@ -1447,11 +1713,13 @@ function handleSectionSubmit(e) {
     if (idx !== -1) {
       state.sections[idx].name = name;
       showToast('Section updated');
+      syncSectionToFirestore(state.sections[idx]);
     }
   } else {
     const newSection = { id: `section-${Date.now()}`, name: name, order: state.sections.length };
     state.sections.push(newSection);
     showToast('Section created');
+    syncSectionToFirestore(newSection);
   }
   saveDatabase();
   resetSectionForm();
@@ -1544,6 +1812,7 @@ function handleBroadcastSubmit(e) {
       state.broadcasts[idx].time = time;
       state.broadcasts[idx].body = body;
       showToast('Announcement updated');
+      syncBroadcastToFirestore(state.broadcasts[idx]);
     }
   } else {
     const newBroadcast = {
@@ -1554,6 +1823,7 @@ function handleBroadcastSubmit(e) {
     };
     state.broadcasts.unshift(newBroadcast); 
     showToast('New Announcement Posted!');
+    syncBroadcastToFirestore(newBroadcast);
   }
 
   saveDatabase();
@@ -1565,6 +1835,7 @@ function handleBroadcastSubmit(e) {
 function deleteBroadcast(id) {
   state.broadcasts = state.broadcasts.filter(b => b.id !== id);
   saveDatabase();
+  syncDeleteBroadcastFromFirestore(id);
   renderWidgets();
   renderBroadcastList();
   showToast('Announcement deleted.');
@@ -1667,41 +1938,9 @@ function bindEventHandlers() {
 
 // --- Firebase Authentication Observer Integration ---
 function initFirebaseAuth() {
-  onAuthStateChanged(auth, (firebaseUser) => {
+  onAuthStateChanged(auth, async (firebaseUser) => {
     if (firebaseUser) {
-      // Find matching employee by email address
-      let localUser = state.users.find(u => u.email && u.email.toLowerCase() === firebaseUser.email.toLowerCase());
-      
-      // Auto-assign very first user (Cole) or matching name to Admin, else dynamic register as Guest
-      if (!localUser) {
-        const isCole = firebaseUser.email.toLowerCase().includes('cole') || (firebaseUser.displayName && firebaseUser.displayName.toLowerCase().includes('cole'));
-        
-        localUser = {
-          id: firebaseUser.uid,
-          name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
-          email: firebaseUser.email.toLowerCase(),
-          role: isCole ? 'Admin' : 'Guest'
-        };
-        
-        state.users.push(localUser);
-        
-        // Seed standard permissions
-        if (localUser.role === 'Admin') {
-          state.permissions[localUser.id] = state.apps.map(a => a.id);
-        } else {
-          state.permissions[localUser.id] = ['catalog', 'ai-troubleshoot']; // Default guest privileges
-        }
-        
-        saveDatabase();
-      }
-      
-      state.activeUserId = localUser.id;
-      saveDatabase();
-      
-      // Render logged in UI
-      renderAuthHeader(firebaseUser);
-      renderAppGrid();
-      showToast(`Logged in: ${localUser.name}`);
+      await loadDatabaseFromFirestore();
     } else {
       // Logged Out State
       state.activeUserId = null;

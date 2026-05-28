@@ -1,0 +1,136 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: apps
+    // Document ID: app string (e.g. 'inventory')
+    // Fields:
+    //   - id: string (required) - unique ID
+    //   - name: string (required, size < 100) - app display name
+    //   - link: string (required) - target URL
+    //   - icon: string (required) - vector icon key
+    //   - order: number (required) - display sorting order
+    //   - type: string (required) - 'app' or 'folder'
+    //   - sectionId: string (required) - section ID
+    //   - appIds: list (optional, max size 50) - folder sub-apps list
+    //
+    // Collection: sections
+    // Document ID: section string (e.g. 'default')
+    // Fields:
+    //   - id: string (required) - unique ID
+    //   - name: string (required, size < 100) - section title
+    //   - order: number (required) - section vertical sort order
+    //
+    // Collection: broadcasts
+    // Document ID: broadcast string (e.g. 'b-1')
+    // Fields:
+    //   - id: string (required) - unique ID
+    //   - title: string (required, size < 150) - announcement headline
+    //   - body: string (required, size < 2000) - announcement details
+    //   - time: string (required, size < 50) - display timestamp string
+    //
+    // Collection: users
+    // Document ID: uid string (Firebase Auth UID)
+    // Fields:
+    //   - id: string (required) - matches document ID
+    //   - name: string (required, size < 100) - employee display name
+    //   - email: string (required) - sign-in email address
+    //   - role: string (required) - privilege role
+    //
+    // Collection: permissions
+    // Document ID: uid string
+    // Fields:
+    //   - appIds: list (required, max size 100) - permitted application IDs list
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Check if the current user has the Admin role in database OR is the bootstrap email
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'cole@4hgs.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin')
+      );
+    }
+    
+    // Validate email format
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+    
+    // Validate URL format
+    function isValidUrl(url) {
+      return url is string &&
+        (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // Apps directory
+    match /apps/{appId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Dashboard sections
+    match /sections/{sectionId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // News broadcasts
+    match /broadcasts/{broadcastId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Users Profiles
+    match /users/{userId} {
+      // User can read their own profile, Admin can read/write all
+      allow read: if isOwner(userId) || isAdmin();
+      // Allow self-creation on first sign-in (must be guest initially unless cole@4hgs.com)
+      allow create: if isAuthenticated() && (
+        isAdmin() || (
+          isOwner(userId) && 
+          request.resource.data.role == 'Guest' &&
+          request.resource.data.email == request.auth.token.email
+        )
+      );
+      // Admin can update any role, self can update only profile fields (but role must remain unchanged)
+      allow update: if isAuthenticated() && (
+        isAdmin() || (
+          isOwner(userId) && 
+          request.resource.data.role == resource.data.role &&
+          request.resource.data.email == resource.data.email
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Access permissions matrix
+    match /permissions/{userId} {
+      // User can read their own access map, Admin can do all
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isAdmin();
+    }
+  }
+}
