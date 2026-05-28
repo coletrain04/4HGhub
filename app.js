@@ -195,20 +195,6 @@ async function loadDatabaseFromFirestore() {
     broadcastsSnapshot.forEach(doc => {
       broadcastsList.push(doc.data());
     });
-    
-    // 4. Fetch users
-    const usersSnapshot = await getDocs(collection(db, "users"));
-    const usersList = [];
-    usersSnapshot.forEach(doc => {
-      usersList.push(doc.data());
-    });
-    
-    // 5. Fetch permissions
-    const permissionsSnapshot = await getDocs(collection(db, "permissions"));
-    const permissionsMap = {};
-    permissionsSnapshot.forEach(doc => {
-      permissionsMap[doc.id] = doc.data().appIds || [];
-    });
 
     const isCole = auth.currentUser.email && (
       auth.currentUser.email.toLowerCase() === 'cole@4hgs.com' ||
@@ -222,31 +208,65 @@ async function loadDatabaseFromFirestore() {
       return;
     }
 
-    // Assign to in-memory state
-    state.apps = appsList.length > 0 ? appsList : DEFAULT_APPS;
-    state.sections = sectionsList.length > 0 ? sectionsList : DEFAULT_SECTIONS;
-    state.broadcasts = broadcastsList;
-    state.users = usersList;
-    state.permissions = permissionsMap;
+    // Try fetching the active user's document directly first to check role
+    const activeUserDocRef = doc(db, "users", auth.currentUser.uid);
+    const activeUserDocSnap = await getDoc(activeUserDocRef);
+    
+    let activeUser = null;
+    let isAdmin = isCole; // Default to email check for Cole
 
-    // Ensure current active user profile exists in database
-    let activeUser = state.users.find(u => u.id === auth.currentUser.uid);
-    if (!activeUser) {
+    if (activeUserDocSnap.exists()) {
+      activeUser = activeUserDocSnap.data();
+      isAdmin = activeUser.role === 'Admin';
+    } else {
+      // First-time signup registration
       activeUser = {
         id: auth.currentUser.uid,
         name: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
         email: auth.currentUser.email.toLowerCase(),
         role: isCole ? 'Admin' : 'Guest'
       };
-      state.users.push(activeUser);
       await setDoc(doc(db, "users", activeUser.id), activeUser);
 
-      // Seed standard permissions
-      const initialPerms = isCole ? state.apps.map(a => a.id) : ['catalog', 'ai-troubleshoot'];
-      state.permissions[activeUser.id] = initialPerms;
+      // Seed standard permissions for new signup
+      const initialPerms = isCole ? appsList.map(a => a.id) : ['catalog', 'ai-troubleshoot'];
       await setDoc(doc(db, "permissions", activeUser.id), { appIds: initialPerms });
+    }
+
+    // Assign apps, sections, and broadcasts
+    state.apps = appsList.length > 0 ? appsList : DEFAULT_APPS;
+    state.sections = sectionsList.length > 0 ? sectionsList : DEFAULT_SECTIONS;
+    state.broadcasts = broadcastsList;
+
+    // Load users and permissions depending on role
+    if (isAdmin) {
+      // Admin is allowed to read all users and all permissions
+      const usersSnapshot = await getDocs(collection(db, "users"));
+      const usersList = [];
+      usersSnapshot.forEach(doc => {
+        usersList.push(doc.data());
+      });
+      state.users = usersList;
+
+      const permissionsSnapshot = await getDocs(collection(db, "permissions"));
+      const permissionsMap = {};
+      permissionsSnapshot.forEach(doc => {
+        permissionsMap[doc.id] = doc.data().appIds || [];
+      });
+      state.permissions = permissionsMap;
+    } else {
+      // Non-admin can only read their own user and permissions documents
+      state.users = [activeUser];
       
-      saveDatabase();
+      const permissionsDocRef = doc(db, "permissions", auth.currentUser.uid);
+      const permissionsDocSnap = await getDoc(permissionsDocRef);
+      const permissionsMap = {};
+      if (permissionsDocSnap.exists()) {
+        permissionsMap[auth.currentUser.uid] = permissionsDocSnap.data().appIds || [];
+      } else {
+        permissionsMap[auth.currentUser.uid] = ['catalog', 'ai-troubleshoot'];
+      }
+      state.permissions = permissionsMap;
     }
 
     state.activeUserId = activeUser.id;
@@ -259,6 +279,9 @@ async function loadDatabaseFromFirestore() {
     renderWidgets();
     renderAuthHeader(auth.currentUser);
     renderAppGrid();
+
+    // Trigger local storage save of current state as cache
+    saveDatabase();
 
   } catch (error) {
     console.error("Firestore database load error:", error);
