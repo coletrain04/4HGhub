@@ -199,11 +199,20 @@ function getFaviconUrl(url) {
   }
   
   let domain = '';
+  let protocol = 'https:';
   try {
-    domain = new URL(cleanedUrl).hostname;
+    const parsed = new URL(cleanedUrl);
+    domain = parsed.hostname;
+    protocol = parsed.protocol;
   } catch (e) {
-    const match = cleanedUrl.match(/(?:https?:\/\/)?(?:www\.)?([^\/\s\?#:]+)/i);
-    domain = (match && match[1]) ? match[1] : '';
+    const match = cleanedUrl.match(/^(https?:)?\/\/(?:www\.)?([^\/\s\?#:]+)/i);
+    if (match) {
+      protocol = match[1] || 'https:';
+      domain = match[2];
+    } else {
+      const simpleMatch = cleanedUrl.match(/(?:www\.)?([^\/\s\?#:]+)/i);
+      domain = (simpleMatch && simpleMatch[1]) ? simpleMatch[1] : '';
+    }
   }
   
   if (!domain) {
@@ -217,7 +226,10 @@ function getFaviconUrl(url) {
     return 'https://4hgs.com/wp-content/uploads/2025/10/4HGS-Circle-Logo.pdf-2.png';
   }
   
-  return `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
+  // Try loading the favicon DIRECTLY from the target site first!
+  // This is highly robust and crucial for intranet/private/local network sites 
+  // where external crawlers (Google/DuckDuckGo) cannot reach.
+  return `${protocol}//${domain}/favicon.ico`;
 }
 
 // User Permission evaluator
@@ -235,7 +247,27 @@ function getActiveUser() {
 // Dynamic Icon rendering helper
 function getIconMarkup(item) {
   if (item.icon === 'favicon') {
-    return `<img src="${getFaviconUrl(item.link)}" class="app-favicon-img" alt="" onerror="this.onerror=null; this.src='https://4hgs.com/wp-content/uploads/2025/10/4HGS-Circle-Logo.pdf-2.png'">`;
+    const directFavicon = getFaviconUrl(item.link);
+    
+    // Multi-stage fallback:
+    // 1. Try loading the favicon directly from the website (works for local network / intranet sites)
+    // 2. If it fails, fallback to Google's public high-res s2 favicon service
+    // 3. If that also fails, gracefully fallback to the premium official 4HGS circular logo!
+    try {
+      let domain = '';
+      let cleanedUrl = item.link.trim();
+      if (!/^https?:\/\//i.test(cleanedUrl)) {
+        cleanedUrl = 'https://' + cleanedUrl;
+      }
+      domain = new URL(cleanedUrl).hostname;
+      
+      const googleFallback = `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
+      const finalCorporateFallback = `https://4hgs.com/wp-content/uploads/2025/10/4HGS-Circle-Logo.pdf-2.png`;
+      
+      return `<img src="${directFavicon}" class="app-favicon-img" alt="" onerror="this.onerror=null; this.src='${googleFallback}'; this.onerror=function(){this.onerror=null; this.src='${finalCorporateFallback}';};">`;
+    } catch(e) {
+      return `<img src="${directFavicon}" class="app-favicon-img" alt="" onerror="this.onerror=null; this.src='https://4hgs.com/wp-content/uploads/2025/10/4HGS-Circle-Logo.pdf-2.png'">`;
+    }
   }
   return SVG_ICONS[item.icon] || SVG_ICONS.box;
 }
