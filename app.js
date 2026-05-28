@@ -1407,6 +1407,7 @@ function handleAppSubmit(e) {
       state.apps[appIndex].icon = icon;
       state.apps[appIndex].sectionId = document.getElementById('app-section').value || 'default';
       showToast('Application updated successfully');
+      syncAppToFirestore(state.apps[appIndex]);
     }
   } else {
     // CREATING NEW APP
@@ -1427,10 +1428,12 @@ function handleAppSubmit(e) {
         if (!state.permissions[u.id]) state.permissions[u.id] = [];
         if (!state.permissions[u.id].includes(newApp.id)) {
           state.permissions[u.id].push(newApp.id);
+          syncPermissionToFirestore(u.id, state.permissions[u.id]);
         }
       }
     });
     showToast('New Application Added Successfully!');
+    syncAppToFirestore(newApp);
   }
 
   saveDatabase();
