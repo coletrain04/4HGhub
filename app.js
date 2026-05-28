@@ -198,16 +198,26 @@ function getFaviconUrl(url) {
     cleanedUrl = 'https://' + cleanedUrl;
   }
   
+  let domain = '';
   try {
-    const domain = new URL(cleanedUrl).hostname;
-    return `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
+    domain = new URL(cleanedUrl).hostname;
   } catch (e) {
     const match = cleanedUrl.match(/(?:https?:\/\/)?(?:www\.)?([^\/\s\?#:]+)/i);
-    if (match && match[1]) {
-      return `https://www.google.com/s2/favicons?sz=128&domain=${match[1]}`;
-    }
-    return 'https://www.google.com/s2/favicons?sz=128&domain=4hgs.com';
+    domain = (match && match[1]) ? match[1] : '';
   }
+  
+  if (!domain) {
+    return 'https://4hgs.com/wp-content/uploads/2025/10/4HGS-Circle-Logo.pdf-2.png';
+  }
+  
+  const lowerDomain = domain.toLowerCase();
+  // Brand Intelligence: For any corporate domain, intranet subdomain, or sharepoint portal,
+  // directly serve the gorgeous official 4HG Source circle logo instead of generic fallback globes.
+  if (lowerDomain.endsWith('4hgs.com') || lowerDomain.endsWith('4hghub.com') || lowerDomain.includes('4hgsource')) {
+    return 'https://4hgs.com/wp-content/uploads/2025/10/4HGS-Circle-Logo.pdf-2.png';
+  }
+  
+  return `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
 }
 
 // User Permission evaluator
@@ -225,7 +235,7 @@ function getActiveUser() {
 // Dynamic Icon rendering helper
 function getIconMarkup(item) {
   if (item.icon === 'favicon') {
-    return `<img src="${getFaviconUrl(item.link)}" class="app-favicon-img" alt="" onerror="this.onerror=null; this.src='https://www.google.com/s2/favicons?sz=128&domain=4hgs.com'">`;
+    return `<img src="${getFaviconUrl(item.link)}" class="app-favicon-img" alt="" onerror="this.onerror=null; this.src='https://4hgs.com/wp-content/uploads/2025/10/4HGS-Circle-Logo.pdf-2.png'">`;
   }
   return SVG_ICONS[item.icon] || SVG_ICONS.box;
 }
