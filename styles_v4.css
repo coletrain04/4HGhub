@@ -1193,3 +1193,25 @@ footer a {
 footer a:hover {
   text-decoration: underline;
 }
+
+/* Logged Out / Secure Login View Styles */
+body.logged-out .widgets-panel {
+  display: none !important;
+}
+
+body.logged-out .dashboard-container {
+  grid-template-columns: 1fr;
+  max-width: 520px;
+  margin: 0 auto;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 180px);
+  padding: 3rem 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  body.logged-out .dashboard-container {
+    padding: 1.5rem 1rem;
+    min-height: auto;
+  }
+}
