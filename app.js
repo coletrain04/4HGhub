@@ -191,11 +191,22 @@ function showToast(message, isSuccess = true) {
 
 // Extract domain favicon link
 function getFaviconUrl(url) {
+  if (!url) return '';
+  let cleanedUrl = url.trim();
+  
+  if (!/^https?:\/\//i.test(cleanedUrl)) {
+    cleanedUrl = 'https://' + cleanedUrl;
+  }
+  
   try {
-    const domain = new URL(url).hostname;
-    return `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+    const domain = new URL(cleanedUrl).hostname;
+    return `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
   } catch (e) {
-    return '';
+    const match = cleanedUrl.match(/(?:https?:\/\/)?(?:www\.)?([^\/\s\?#:]+)/i);
+    if (match && match[1]) {
+      return `https://www.google.com/s2/favicons?sz=128&domain=${match[1]}`;
+    }
+    return 'https://www.google.com/s2/favicons?sz=128&domain=4hgs.com';
   }
 }
 
@@ -214,7 +225,7 @@ function getActiveUser() {
 // Dynamic Icon rendering helper
 function getIconMarkup(item) {
   if (item.icon === 'favicon') {
-    return `<img src="${getFaviconUrl(item.link)}" class="app-favicon-img" alt="" onerror="this.onerror=null; this.src='https://icons.duckduckgo.com/ip3/default.ico'">`;
+    return `<img src="${getFaviconUrl(item.link)}" class="app-favicon-img" alt="" onerror="this.onerror=null; this.src='https://www.google.com/s2/favicons?sz=128&domain=4hgs.com'">`;
   }
   return SVG_ICONS[item.icon] || SVG_ICONS.box;
 }
